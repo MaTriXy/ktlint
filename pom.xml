@@ -40,10 +40,12 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <kotlin.version>1.1.51</kotlin.version>
+        <kotlin.version>1.2.0</kotlin.version>
+        <kotlin.compiler.languageVersion>1.1</kotlin.compiler.languageVersion>
         <aether.version>1.1.0</aether.version>
         <aether.maven.provider.version>3.2.5</aether.maven.provider.version>
         <args4j.version>2.33</args4j.version>
+        <kolor.version>0.0.2</kolor.version>
         <testng.version>6.8.21</testng.version>
         <assertj.version>1.7.1</assertj.version>
     </properties>
@@ -221,7 +223,7 @@
                         <configuration>
                             <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                             <serverId>maven-central</serverId>
-                            <skipStagingRepositoryClose>true</skipStagingRepositoryClose>
+                            <!--<skipStagingRepositoryClose>true</skipStagingRepositoryClose>-->
                             <!--<autoReleaseAfterClose>true</autoReleaseAfterClose>-->
                         </configuration>
                     </plugin>
@@ -307,20 +309,24 @@
                 </property>
             </activation>
             <build>
-                <defaultGoal>antrun:run</defaultGoal>
+                <defaultGoal>exec:exec@announce</defaultGoal>
                 <plugins>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <version>1.7</version>
-                        <configuration>
-                            <target name="announce">
-                                <exec executable="${project.basedir}/.announce" failonerror="true">
-                                    <env key="VERSION" value="${project.version}"/>
-                                    <env key="GITHUB_TOKEN" value="${settings.servers.github.privateKey}"/>
-                                </exec>
-                            </target>
-                        </configuration>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>1.5.0</version>
+                        <executions>
+                            <execution>
+                                <id>announce</id>
+                                <configuration>
+                                    <executable>${project.basedir}/.announce</executable>
+                                    <environmentVariables>
+                                        <VERSION>${project.version}</VERSION>
+                                        <GITHUB_TOKEN>${settings.servers.github.privateKey}</GITHUB_TOKEN>
+                                    </environmentVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>

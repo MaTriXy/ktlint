@@ -54,15 +54,15 @@ class IndentationRuleTest {
             ) {
             }
 
-            fun f(val a: Any,
-                  val b: Any,
-                  val c: Any) {
+            fun f(a: Any,
+                  b: Any,
+                  c: Any) {
             }
 
             fun f2(
-                val a: Any,
-                val b: Any,
-                val c: Any
+                a: Any,
+                b: Any,
+                c: Any
             ) {
             }
             """.trimIndent()
@@ -126,6 +126,22 @@ class IndentationRuleTest {
             """.trimIndent(),
             mapOf("indent_size" to "unset")
         )).isEmpty()
+    }
+
+    @Test
+    fun testShouldReportIncorrectIndentOfFirstParameter() {
+        assertThat(IndentationRule().lint(
+            """
+            fun x(
+                 x: Int = 0,
+                y: Int = 0
+            ) {
+            }
+            """.trimIndent(),
+            script = true
+        )).isEqualTo(listOf(
+            LintError(2, 1, "indent", "Unexpected indentation (5) (it should be 4)")
+        ))
     }
 
     @Test

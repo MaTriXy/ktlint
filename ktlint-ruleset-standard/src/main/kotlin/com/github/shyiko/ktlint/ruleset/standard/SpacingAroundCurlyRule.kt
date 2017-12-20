@@ -41,11 +41,10 @@ class SpacingAroundCurlyRule : Rule("curly-spacing") {
                     node.parent.node.elementType == KtNodeTypes.CLASS_BODY)) {
                     emit(node.startOffset, "Unexpected newline before \"${node.text}\"", true)
                     if (autoCorrect) {
-                        (prevLeaf.node as LeafPsiElement).replaceWithText(" ")
+                        (prevLeaf.node as LeafPsiElement).rawReplaceWithText(" ")
                     }
                 }
-            } else
-            if (node.textMatches("}")) {
+            } else if (node.textMatches("}")) {
                 spacingBefore = prevLeaf is PsiWhiteSpace || prevLeaf?.node?.elementType == KtTokens.LBRACE
                 spacingAfter = nextLeaf == null || nextLeaf is PsiWhiteSpace || shouldNotToBeSeparatedBySpace(nextLeaf)
                 if (nextLeaf is PsiWhiteSpace && !nextLeaf.textContains('\n') &&
