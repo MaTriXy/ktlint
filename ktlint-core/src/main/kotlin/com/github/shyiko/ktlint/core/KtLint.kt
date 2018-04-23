@@ -1,5 +1,7 @@
 package com.github.shyiko.ktlint.core
 
+import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode
@@ -35,6 +37,7 @@ object KtLint {
 
     val EDITOR_CONFIG_USER_DATA_KEY = Key<EditorConfig>("EDITOR_CONFIG")
     val ANDROID_USER_DATA_KEY = Key<Boolean>("ANDROID")
+    val FILE_PATH_USER_DATA_KEY = Key<String>("FILE_PATH")
 
     private val psiFileFactory: PsiFileFactory
     private val nullSuppression = { _: Int, _: String -> false }
@@ -48,8 +51,10 @@ object KtLint {
             }
         }
         DiagnosticLogger.setFactory(LoggerFactory::class.java)
+        val compilerConfiguration = CompilerConfiguration()
+        compilerConfiguration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
         val project = KotlinCoreEnvironment.createForProduction(Disposable {},
-            CompilerConfiguration(), EnvironmentConfigFiles.EMPTY).project
+            compilerConfiguration, EnvironmentConfigFiles.JVM_CONFIG_FILES).project
         // everything below (up to PsiFileFactory.getInstance(...)) is to get AST mutations (`ktlint -F ...`) working
         // otherwise it's not needed
         val pomModel: PomModel = object : UserDataHolderBase(), PomModel {
@@ -139,11 +144,14 @@ object KtLint {
             throw ParseException(line, col, errorElement.errorDescription)
         }
         val rootNode = psiFile.node
-        rootNode.putUserData(EDITOR_CONFIG_USER_DATA_KEY, EditorConfig.fromMap(userData - "android"))
+        rootNode.putUserData(EDITOR_CONFIG_USER_DATA_KEY, EditorConfig.fromMap(userData - "android" - "file_path"))
         rootNode.putUserData(ANDROID_USER_DATA_KEY, userData["android"]?.toBoolean() ?: false)
+        rootNode.putUserData(FILE_PATH_USER_DATA_KEY, userData["file_path"])
         val isSuppressed = calculateSuppressedRegions(rootNode)
         visitor(rootNode, ruleSets).invoke { node, rule, fqRuleId ->
-            if (!isSuppressed(node.startOffset, fqRuleId)) {
+            // fixme: enforcing suppression based on node.startOffset is wrong
+            // (not just because not all nodes are leaves but because rules are free to emit (and fix!) errors at any position)
+            if (!isSuppressed(node.startOffset, fqRuleId) || node === rootNode) {
                 try {
                     rule.visit(node, false) { offset, errorMessage, _ ->
                         val (line, col) = positionByOffset(offset)
@@ -159,17 +167,25 @@ object KtLint {
 
     private fun visitor(
         rootNode: ASTNode,
-        ruleSets: Iterable<RuleSet>
+        ruleSets: Iterable<RuleSet>,
+        concurrent: Boolean = true,
+        filter: (fqRuleId: String) -> Boolean = { true }
     ): ((node: ASTNode, rule: Rule, fqRuleId: String) -> Unit) -> Unit {
         val fqrsRestrictedToRoot = mutableListOf<Pair<String, Rule>>()
         val fqrs = mutableListOf<Pair<String, Rule>>()
+        val fqrsExpectedToBeExecutedLastOnRoot = mutableListOf<Pair<String, Rule>>()
         val fqrsExpectedToBeExecutedLast = mutableListOf<Pair<String, Rule>>()
         for (ruleSet in ruleSets) {
             val prefix = if (ruleSet.id === "standard") "" else "${ruleSet.id}:"
             for (rule in ruleSet) {
-                val fqr = "$prefix${rule.id}" to rule
+                val fqRuleId = "$prefix${rule.id}"
+                if (!filter(fqRuleId)) {
+                    continue
+                }
+                val fqr = fqRuleId to rule
                 when {
-                    rule is Rule.Modifier.RestrictToRootLast -> fqrsExpectedToBeExecutedLast.add(fqr)
+                    rule is Rule.Modifier.Last -> fqrsExpectedToBeExecutedLast.add(fqr)
+                    rule is Rule.Modifier.RestrictToRootLast -> fqrsExpectedToBeExecutedLastOnRoot.add(fqr)
                     rule is Rule.Modifier.RestrictToRoot -> fqrsRestrictedToRoot.add(fqr)
                     else -> fqrs.add(fqr)
                 }
@@ -179,13 +195,36 @@ object KtLint {
             for ((fqRuleId, rule) in fqrsRestrictedToRoot) {
                 visit(rootNode, rule, fqRuleId)
             }
-            rootNode.visit { node ->
+            if (concurrent) {
+                rootNode.visit { node ->
+                    for ((fqRuleId, rule) in fqrs) {
+                        visit(node, rule, fqRuleId)
+                    }
+                }
+            } else {
                 for ((fqRuleId, rule) in fqrs) {
-                    visit(node, rule, fqRuleId)
+                    rootNode.visit { node ->
+                        visit(node, rule, fqRuleId)
+                    }
                 }
             }
-            for ((fqRuleId, rule) in fqrsExpectedToBeExecutedLast) {
+            for ((fqRuleId, rule) in fqrsExpectedToBeExecutedLastOnRoot) {
                 visit(rootNode, rule, fqRuleId)
+            }
+            if (!fqrsExpectedToBeExecutedLast.isEmpty()) {
+                if (concurrent) {
+                    rootNode.visit { node ->
+                        for ((fqRuleId, rule) in fqrsExpectedToBeExecutedLast) {
+                            visit(node, rule, fqRuleId)
+                        }
+                    }
+                } else {
+                    for ((fqRuleId, rule) in fqrsExpectedToBeExecutedLast) {
+                        rootNode.visit { node ->
+                            visit(node, rule, fqRuleId)
+                        }
+                    }
+                }
             }
         }
     }
@@ -232,8 +271,12 @@ object KtLint {
     fun format(text: String, ruleSets: Iterable<RuleSet>, cb: (e: LintError, corrected: Boolean) -> Unit): String =
         format(text, ruleSets, emptyMap<String, String>(), cb, script = false)
 
-    fun format(text: String, ruleSets: Iterable<RuleSet>, userData: Map<String, String>,
-        cb: (e: LintError, corrected: Boolean) -> Unit): String = format(text, ruleSets, userData, cb, script = false)
+    fun format(
+        text: String,
+        ruleSets: Iterable<RuleSet>,
+        userData: Map<String, String>,
+        cb: (e: LintError, corrected: Boolean) -> Unit
+    ): String = format(text, ruleSets, userData, cb, script = false)
 
     /**
      * Fix style violations.
@@ -248,8 +291,12 @@ object KtLint {
     fun formatScript(text: String, ruleSets: Iterable<RuleSet>, cb: (e: LintError, corrected: Boolean) -> Unit): String =
         format(text, ruleSets, emptyMap(), cb, script = true)
 
-    fun formatScript(text: String, ruleSets: Iterable<RuleSet>, userData: Map<String, String>,
-        cb: (e: LintError, corrected: Boolean) -> Unit): String = format(text, ruleSets, userData, cb, script = true)
+    fun formatScript(
+        text: String,
+        ruleSets: Iterable<RuleSet>,
+        userData: Map<String, String>,
+        cb: (e: LintError, corrected: Boolean) -> Unit
+    ): String = format(text, ruleSets, userData, cb, script = true)
 
     private fun format(
         text: String,
@@ -271,34 +318,25 @@ object KtLint {
             throw ParseException(line, col, errorElement.errorDescription)
         }
         val rootNode = psiFile.node
-        rootNode.putUserData(EDITOR_CONFIG_USER_DATA_KEY, EditorConfig.fromMap(userData - "android"))
+        rootNode.putUserData(EDITOR_CONFIG_USER_DATA_KEY, EditorConfig.fromMap(userData - "android" - "file_path"))
         rootNode.putUserData(ANDROID_USER_DATA_KEY, userData["android"]?.toBoolean() ?: false)
+        rootNode.putUserData(FILE_PATH_USER_DATA_KEY, userData["file_path"])
         var isSuppressed = calculateSuppressedRegions(rootNode)
-        val visit = visitor(rootNode, ruleSets)
-        var autoCorrect = false
-        visit { node, rule, fqRuleId ->
-            if (!isSuppressed(node.startOffset, fqRuleId)) {
-                try {
-                    rule.visit(node, false) { offset, errorMessage, canBeAutoCorrected ->
-                        if (canBeAutoCorrected) {
-                            autoCorrect = true
-                        }
-                        val (line, col) = positionByOffset(offset)
-                        cb(LintError(line, col, fqRuleId, errorMessage), canBeAutoCorrected)
-                    }
-                } catch (e: Exception) {
-                    val (line, col) = positionByOffset(node.startOffset)
-                    throw RuleExecutionException(line, col, fqRuleId, e)
-                }
-            }
-        }
-        if (autoCorrect) {
-            visit { node, rule, fqRuleId ->
-                if (!isSuppressed(node.startOffset, fqRuleId)) {
+        var tripped = false
+        var mutated = false
+        visitor(rootNode, ruleSets, concurrent = false)
+            .invoke { node, rule, fqRuleId ->
+                // fixme: enforcing suppression based on node.startOffset is wrong
+                // (not just because not all nodes are leaves but because rules are free to emit (and fix!) errors at any position)
+                if (!isSuppressed(node.startOffset, fqRuleId) || node === rootNode) {
                     try {
                         rule.visit(node, true) { _, _, canBeAutoCorrected ->
-                            if (canBeAutoCorrected && isSuppressed !== nullSuppression) {
-                                isSuppressed = calculateSuppressedRegions(rootNode)
+                            tripped = true
+                            if (canBeAutoCorrected) {
+                                mutated = true
+                                if (isSuppressed !== nullSuppression) {
+                                    isSuppressed = calculateSuppressedRegions(rootNode)
+                                }
                             }
                         }
                     } catch (e: Exception) {
@@ -308,9 +346,24 @@ object KtLint {
                     }
                 }
             }
-            return rootNode.text.replace("\n", determineLineSeparator(text))
+        if (tripped) {
+            visitor(rootNode, ruleSets).invoke { node, rule, fqRuleId ->
+                // fixme: enforcing suppression based on node.startOffset is wrong
+                // (not just because not all nodes are leaves but because rules are free to emit (and fix!) errors at any position)
+                if (!isSuppressed(node.startOffset, fqRuleId) || node === rootNode) {
+                    try {
+                        rule.visit(node, false) { offset, errorMessage, _ ->
+                            val (line, col) = positionByOffset(offset)
+                            cb(LintError(line, col, fqRuleId, errorMessage), false)
+                        }
+                    } catch (e: Exception) {
+                        val (line, col) = positionByOffset(node.startOffset)
+                        throw RuleExecutionException(line, col, fqRuleId, e)
+                    }
+                }
+            }
         }
-        return text
+        return if (mutated) rootNode.text.replace("\n", determineLineSeparator(text)) else text
     }
 
     private fun calculateLineBreakOffset(fileContent: String): (offset: Int) -> Int {

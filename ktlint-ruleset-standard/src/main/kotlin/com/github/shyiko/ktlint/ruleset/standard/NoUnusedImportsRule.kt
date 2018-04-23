@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
 class NoUnusedImportsRule : Rule("no-unused-imports") {
 
+    private val componentNRegex = Regex("^component\\d+$")
+
     private val operatorSet = setOf(
         // unary
         "unaryPlus", "unaryMinus", "not",
@@ -34,15 +36,16 @@ class NoUnusedImportsRule : Rule("no-unused-imports") {
         // iteration (https://github.com/shyiko/ktlint/issues/40)
         "iterator",
         // by (https://github.com/shyiko/ktlint/issues/54)
-        "getValue", "setValue",
-        // destructuring assignment
-        "component1", "component2", "component3", "component4", "component5"
+        "getValue", "setValue"
     )
     private val ref = mutableSetOf<String>()
     private var packageName = ""
 
-    override fun visit(node: ASTNode, autoCorrect: Boolean,
-            emit: (offset: Int, errorMessage: String, canBeAutoCorrected: Boolean) -> Unit) {
+    override fun visit(
+        node: ASTNode,
+        autoCorrect: Boolean,
+        emit: (offset: Int, errorMessage: String, canBeAutoCorrected: Boolean) -> Unit
+    ) {
         if (node.elementType == KtStubElementTypes.FILE) {
             ref.clear() // rule can potentially be executed more than once (when formatting)
             ref.add("*")
@@ -71,7 +74,7 @@ class NoUnusedImportsRule : Rule("no-unused-imports") {
                 if (autoCorrect) {
                     importDirective.delete()
                 }
-            } else if (name != null && !ref.contains(name) && !operatorSet.contains(name)) {
+            } else if (name != null && !ref.contains(name) && !operatorSet.contains(name) && !name.isComponentN()) {
                 emit(importDirective.startOffset, "Unused import", true)
                 if (autoCorrect) {
                     importDirective.delete()
@@ -79,6 +82,8 @@ class NoUnusedImportsRule : Rule("no-unused-imports") {
             }
         }
     }
+
+    private fun String.isComponentN() = componentNRegex.matches(this)
 
     private fun ASTNode.visit(cb: (node: ASTNode) -> Unit) {
         cb(this)
