@@ -18,7 +18,7 @@
 Features:
 - **No configuration.** Which means no decisions to make, nothing to argue about and no special files to manage.   
 While this might sound extreme, keep in mind that `ktlint` tries to capture (reflect) **official code style** from [kotlinlang.org](https://kotlinlang.org/docs/reference/coding-conventions.html) and [Android Kotlin Style Guide](https://android.github.io/kotlin-guides/style.html)
-(+ [we respect you .editorconfig](#editorconfig) and support additional [ruleset](#creating-a-ruleset)|s).
+(+ [we respect your .editorconfig](#editorconfig) and support additional [ruleset](#creating-a-ruleset)|s).
 - **Built-in formatter.** So that you wouldn't have to fix all style violations by hand.
 - **Customizable output.** `plain` (+ `plain?group_by_file`), `json` and `checkstyle` reporters are available out-of-the-box. 
 It's also [easy to create your own](#creating-a-reporter).
@@ -46,7 +46,7 @@ It's also [easy to create your own](#creating-a-reporter).
 - When class/function signature doesn't fit on a single line, each parameter must be on a separate line;
 - Consistent string templates (`$v` instead of `${v}`, `${p.v}` instead of `${p.v.toString()}`);
 - Consistent order of modifiers;
-- Consistent spacing after keywords, commas; around colons, curly braces, infix operators, etc;
+- Consistent spacing after keywords, commas; around colons, curly braces, parens, infix operators, comments, etc;
 - Newline at the end of each file (not enabled by default, but recommended)  
 (set `insert_final_newline=true` in .editorconfig to enable (see [EditorConfig](#editorconfig) section for more)).
 
@@ -72,7 +72,7 @@ max_line_length=off
 > Skip all the way to the "Integration" section if you don't plan to use `ktlint`'s command line interface.
 
 ```sh
-curl -sSLO https://github.com/shyiko/ktlint/releases/download/0.22.0/ktlint &&
+curl -sSLO https://github.com/shyiko/ktlint/releases/download/0.29.0/ktlint &&
   chmod a+x ktlint &&
   sudo mv ktlint /usr/local/bin/
 ```
@@ -109,6 +109,7 @@ $ ktlint --reporter=plain?group_by_file
 $ ktlint --reporter=plain --reporter=checkstyle,output=ktlint-report-in-checkstyle-format.xml
 
 # install git hook to automatically check files for style violations on commit
+# use --install-git-pre-push-hook if you wish to run ktlint on push instead
 $ ktlint --install-git-pre-commit-hook
 ```
 
@@ -166,7 +167,7 @@ $ ktlint --install-git-pre-commit-hook
         <dependency>
             <groupId>com.github.shyiko</groupId>
             <artifactId>ktlint</artifactId>
-            <version>0.22.0</version>
+            <version>0.29.0</version>
         </dependency>
         <!-- additional 3rd party ruleset(s) can be specified here -->
     </dependencies>
@@ -176,6 +177,8 @@ $ ktlint --install-git-pre-commit-hook
 
 To check code style - `mvn antrun:run@ktlint` (it's also bound to `mvn verify`).  
 To run formatter - `mvn antrun:run@ktlint-format`.   
+
+**Another option** is to use a dedicated Maven plugin - [gantsign/ktlint-maven-plugin](https://github.com/gantsign/ktlint-maven-plugin). 
 
 #### ... with [Gradle](https://gradle.org/)
 
@@ -196,7 +199,7 @@ configurations {
 }
 
 dependencies {
-    ktlint "com.github.shyiko:ktlint:0.22.0"
+    ktlint "com.github.shyiko:ktlint:0.29.0"
     // additional 3rd party ruleset(s) can be specified here
     // just add them to the classpath (e.g. ktlint 'groupId:artifactId:version') and 
     // ktlint will pick them up
@@ -230,7 +233,8 @@ See [Making your Gradle tasks incremental](https://proandroiddev.com/making-your
 
 Gradle plugins (in order of appearance):
 - [jlleitschuh/ktlint-gradle](https://github.com/jlleitschuh/ktlint-gradle)  
-The very first ktlint gradle plugin.
+Gradle plugin that automatically creates check and format tasks for project Kotlin sources,
+supports different kotlin plugins and Gradle build caching.
 
 - [jeremymailen/kotlinter-gradle](https://github.com/jeremymailen/kotlinter-gradle)  
 Gradle plugin featuring incremental build, `*.kts` support.
@@ -278,6 +282,8 @@ See [whirm/flycheck-kotlin](https://github.com/whirm/flycheck-kotlin).
 > Integrated with something else? Send a PR.
 
 ## Creating a ruleset
+
+> See also [Writing your first ktlint rule](https://medium.com/@vanniktech/writing-your-first-ktlint-rule-5a1707f4ca5b) by [Niklas Baudy](https://github.com/vanniktech). 
 
 In a nutshell: "ruleset" is a JAR containing one or more [Rule](ktlint-core/src/main/kotlin/com/github/shyiko/ktlint/core/Rule.kt)s gathered together in a [RuleSet](ktlint-core/src/main/kotlin/com/github/shyiko/ktlint/core/RuleSet.kt). `ktlint` is relying on 
 [ServiceLoader](https://docs.oracle.com/javase/8/docs/api/java/util/ServiceLoader.html) to discover all available "RuleSet"s
@@ -343,7 +349,10 @@ a custom [ReporterProvider](ktlint-core/src/main/kotlin/com/github/shyiko/ktlint
 
 To load a custom (3rd party) reporter use `ktlint --reporter=name,artifact=groupId:artifactId:version` / `ktlint --reporter=name,artifact=/path/to/custom-ktlint-reporter.jar`
 (see `ktlint --help` for more).
- 
+
+Third-party:
+* [mcassiano/ktlint-html-reporter](https://github.com/mcassiano/ktlint-html-reporter)
+
 ## Badge
 
 [![ktlint](https://img.shields.io/badge/code%20style-%E2%9D%A4-FF4081.svg)](https://ktlint.github.io/)
@@ -400,6 +409,13 @@ import package.* // ktlint-disable
 ```sh
 git clone https://github.com/shyiko/ktlint && cd ktlint
 ./mvnw # shows how to build, test, etc. project
+```
+#### Running ktlint from local build
+
+This will build ktlint and run it with any args you want to include.
+
+```sh
+gradle run --args="--color"
 ```
 
 #### Access to the latest `master` snapshot

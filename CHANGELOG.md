@@ -2,6 +2,94 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.29.0] - 2018-10-02
+
+### Fixed
+- `no-semi` rule to preserve semicolon after `companion object;` (see [#281](https://github.com/shyiko/ktlint/issues/281) for details).
+- "line number off by one" when `end_of_line=CRLF` is used ([#286](https://github.com/shyiko/ktlint/issues/286)).
+
+### Changed
+- `package-name` rule not to check file location (until [#280](https://github.com/shyiko/ktlint/issues/280) can be properly addressed).
+- `comment-spacing` rule not to flag `//region` & `//endregion` comments ([#278](https://github.com/shyiko/ktlint/issues/278)).
+- `kotlin-compiler` version to 1.2.71 (from 1.2.51).
+
+## [0.28.0] - 2018-09-05
+
+### Fixed
+- ktlint hanging in case of unhandled exception in a reporter ([#277](https://github.com/shyiko/ktlint/issues/277)).
+
+### Changed
+- `package-name` rule (directories containing `.` in their names are no longer considered to be invalid) ([#276](https://github.com/shyiko/ktlint/issues/276)).
+
+## [0.27.0] - 2018-08-06
+
+### Changed
+- ktlint output (report location is now printed only if there are style violations) ([#267](https://github.com/shyiko/ktlint/issues/267)).
+
+## [0.26.0] - 2018-07-30
+
+### Changed
+- `max-line-length` rule (multi-line strings are no longer checked) ([#262](https://github.com/shyiko/ktlint/issues/262)).
+
+## [0.25.1] - 2018-07-25
+
+### Fixed
+- `json` reporter \ and control characters escaping ([#256](https://github.com/shyiko/ktlint/issues/256)).
+
+## [0.25.0] - 2018-07-25
+
+### Added
+- `package-name` rule ([#246](https://github.com/shyiko/ktlint/pull/246)).
+- `--editorconfig=path/to/.editorconfig` ([#250](https://github.com/shyiko/ktlint/pull/250)).
+- Support for `end_of_line=native` (`.editorconfig`) ([#225](https://github.com/shyiko/ktlint/issues/225)).
+- `tab -> space * indent_size` auto-correction (`--format`/`-F`).
+
+### Fixed
+- "Unnecessary semicolon" false positive ([#255](https://github.com/shyiko/ktlint/issues/255)).
+- `(cannot be auto-corrected)` reporting.
+- OOM in `--debug` mode while trying to print `root=true <- root=false` `.editorconfig` chain.
+
+### Changed
+- `kotlin-compiler` version to 1.2.51 (from 1.2.50).
+
+## [0.24.0] - 2018-06-22
+
+### Added 
+- `paren-spacing` rule ([#223](https://github.com/shyiko/ktlint/issues/223)).
+- Report location output ([#218](https://github.com/shyiko/ktlint/issues/218), [#224](https://github.com/shyiko/ktlint/issues/224)).
+- An indication that some lint errors cannot be auto-corrected ([#219](https://github.com/shyiko/ktlint/issues/219)).
+- Git hook to automatically check files for style violations on push (an alternative to existing `ktlint --install-git-pre-commit-hook`)  
+(execute `ktlint --install-git-pre-push-hook` to install) ([#229](https://github.com/shyiko/ktlint/pull/229)).
+- Support for `end_of_line=crlf` (`.editorconfig`) ([#225](https://github.com/shyiko/ktlint/issues/225)).
+
+### Fixed
+- `.editorconfig` path resolution  
+(you no longer need to be inside project directory for `.editorconfig` to be loaded) ([#207](https://github.com/shyiko/ktlint/pull/207)).
+- NPE in case of I/O error ([klob@0.2.1](https://github.com/shyiko/klob/blob/master/CHANGELOG.md#020---2017-07-21)).
+
+### Changed
+- `comment-spacing` rule to exclude `//noinspection` ([#212](https://github.com/shyiko/ktlint/pull/212)).
+- `kotlin-compiler` version to 1.2.50 (from 1.2.41) ([#226](https://github.com/shyiko/ktlint/issues/226)).
+
+## [0.23.1] - 2018-05-04
+
+### Fixed
+- `ClassCastException: cannot be cast to LeafPsiElement` ([#205](https://github.com/shyiko/ktlint/issues/205)).
+
+## [0.23.0] - 2018-05-02
+
+### Added
+- `comment-spacing` ([#198](https://github.com/shyiko/ktlint/pull/198)),  
+  `filename` ([#194](https://github.com/shyiko/ktlint/pull/194)) rules.
+- `parameter-list-wrapping` left parenthesis placement check ([#201](https://github.com/shyiko/ktlint/pull/201)).
+- `parameter-list-wrapping` auto-correction when `max_line_length` is exceeded ([#200](https://github.com/shyiko/ktlint/pull/200)).
+
+### Fixed
+- "Unused import" false positive (x.y.zNNN import inside x.y.z package) ([#204](https://github.com/shyiko/ktlint/issues/204)).
+
+### Changed
+- `kotlin-compiler` version to 1.2.41 (from 1.2.40).
+
 ## [0.22.0] - 2018-04-22
 
 ### Added
@@ -380,6 +468,15 @@ set in `[*{kt,kts}]` section).
 
 ## 0.1.0 - 2016-07-27
 
+[0.29.0]: https://github.com/shyiko/ktlint/compare/0.28.0...0.29.0
+[0.28.0]: https://github.com/shyiko/ktlint/compare/0.27.0...0.28.0
+[0.27.0]: https://github.com/shyiko/ktlint/compare/0.26.0...0.27.0
+[0.26.0]: https://github.com/shyiko/ktlint/compare/0.25.1...0.26.0
+[0.25.1]: https://github.com/shyiko/ktlint/compare/0.25.0...0.25.1
+[0.25.0]: https://github.com/shyiko/ktlint/compare/0.24.0...0.25.0
+[0.24.0]: https://github.com/shyiko/ktlint/compare/0.23.1...0.24.0
+[0.23.1]: https://github.com/shyiko/ktlint/compare/0.23.0...0.23.1
+[0.23.0]: https://github.com/shyiko/ktlint/compare/0.22.0...0.23.0
 [0.22.0]: https://github.com/shyiko/ktlint/compare/0.21.0...0.22.0
 [0.21.0]: https://github.com/shyiko/ktlint/compare/0.20.0...0.21.0
 [0.20.0]: https://github.com/shyiko/ktlint/compare/0.19.0...0.20.0

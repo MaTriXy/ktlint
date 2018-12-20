@@ -68,7 +68,7 @@ class NoUnusedImportsRule : Rule("no-unused-imports") {
             val name = importDirective.importPath?.importedName?.asString()
             val importPath = importDirective.importPath?.pathStr!!
             if (importDirective.aliasName == null &&
-                importPath.startsWith(packageName) &&
+                (packageName.isEmpty() || importPath.startsWith("$packageName.")) &&
                 importPath.substring(packageName.length + 1).indexOf('.') == -1) {
                 emit(importDirective.startOffset, "Unnecessary import", true)
                 if (autoCorrect) {
@@ -84,9 +84,4 @@ class NoUnusedImportsRule : Rule("no-unused-imports") {
     }
 
     private fun String.isComponentN() = componentNRegex.matches(this)
-
-    private fun ASTNode.visit(cb: (node: ASTNode) -> Unit) {
-        cb(this)
-        this.getChildren(null).forEach { it.visit(cb) }
-    }
 }

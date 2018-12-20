@@ -19,7 +19,7 @@ import org.eclipse.aether.repository.RemoteRepository
 import org.eclipse.aether.repository.RepositoryPolicy
 import org.eclipse.aether.repository.RepositoryPolicy.CHECKSUM_POLICY_IGNORE
 import org.eclipse.aether.repository.RepositoryPolicy.UPDATE_POLICY_NEVER
-import org.jetbrains.kotlin.preprocessor.mkdirsOrFail
+import org.jetbrains.kotlin.backend.common.onlyIf
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -27,6 +27,7 @@ import picocli.CommandLine.Parameters
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.io.PrintStream
 import java.math.BigInteger
 import java.net.URLDecoder
@@ -41,12 +42,14 @@ import java.util.Scanner
 import java.util.ServiceLoader
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.jar.Manifest
+import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 
 @Command(
@@ -74,7 +77,7 @@ Examples:
   ktlint --reporter=plain \
     --reporter=checkstyle,output=ktlint-checkstyle-report.xml
   # 3rd-party reporter
-  ktlint --reporter=html,artifact=com.gihub.user:repo:master-SNAPSHOT
+  ktlint --reporter=html,artifact=com.github.user:repo:master-SNAPSHOT
 
 Flags:""",
     synopsisHeading = "",
@@ -118,6 +121,11 @@ object Main {
         "Install git hook to automatically check files for style violations on commit"
     ))
     private var installGitPreCommitHook: Boolean = false
+
+    @Option(names = arrayOf("--install-git-pre-push-hook"), description = arrayOf(
+        "Install git hook to automatically check files for style violations before push"
+    ))
+    private var installGitPrePushHook: Boolean = false
 
     @Option(names = arrayOf("--limit"), description = arrayOf(
         "Maximum number of errors to show (default: show all)"
@@ -169,7 +177,7 @@ object Main {
     ))
     private var rulesets = ArrayList<String>()
 
-    @Option(names = arrayOf("--skip-classpath-check"), description = arrayOf("Do not check classpath for pottential conflicts"))
+    @Option(names = arrayOf("--skip-classpath-check"), description = arrayOf("Do not check classpath for potential conflicts"))
     private var skipClasspathCheck: Boolean = false
 
     @Option(names = arrayOf("--stdin"), description = arrayOf("Read file from stdin"))
@@ -186,6 +194,9 @@ object Main {
 
     @Option(names = arrayOf("-y"), hidden = true)
     private var forceApply: Boolean = false
+
+    @Option(names = arrayOf("--editorconfig"), description = arrayOf("Path to .editorconfig"))
+    private var editorConfigPath: String? = null
 
     @Parameters(hidden = true)
     private var patterns = ArrayList<String>()
@@ -238,6 +249,12 @@ object Main {
                 exitProcess(0)
             }
         }
+        if (installGitPrePushHook) {
+            installGitPrePushHook()
+            if (!apply) {
+                exitProcess(0)
+            }
+        }
         if (apply || applyToProject) {
             applyToIDEA()
             exitProcess(0)
@@ -259,31 +276,19 @@ object Main {
         if (debug) {
             ruleSetProviders.forEach { System.err.println("[DEBUG] Discovered ruleset \"${it.first}\"") }
         }
-        val reporter = loadReporter(dependencyResolver)
-        // load .editorconfig
-        val userData = (
-            EditorConfig.of(workDir)
-                ?.also { editorConfig ->
-                    if (debug) {
-                        System.err.println("[DEBUG] Discovered .editorconfig (${
-                            generateSequence(editorConfig) { it.parent }.map { it.path.parent.toFile().location() }.joinToString()
-                        })")
-                        System.err.println("[DEBUG] ${editorConfig.mapKeys { it.key }} loaded from .editorconfig")
-                    }
-                }
-                ?: emptyMap<String, String>()
-            ) + mapOf("android" to android.toString())
         val tripped = AtomicBoolean()
+        val reporter = loadReporter(dependencyResolver) { tripped.get() }
+        val resolveUserData = userDataResolver()
         data class LintErrorWithCorrectionInfo(val err: LintError, val corrected: Boolean)
         fun process(fileName: String, fileContent: String): List<LintErrorWithCorrectionInfo> {
             if (debug) {
                 System.err.println("[DEBUG] Checking ${if (fileName != "<text>") File(fileName).location() else fileName}")
             }
             val result = ArrayList<LintErrorWithCorrectionInfo>()
-            val localUserData = if (fileName != "<text>") userData + ("file_path" to fileName) else userData
+            val userData = resolveUserData(fileName)
             if (format) {
                 val formattedFileContent = try {
-                    format(fileName, fileContent, ruleSetProviders.map { it.second.get() }, localUserData) { err, corrected ->
+                    format(fileName, fileContent, ruleSetProviders.map { it.second.get() }, userData) { err, corrected ->
                         if (!corrected) {
                             result.add(LintErrorWithCorrectionInfo(err, corrected))
                             tripped.set(true)
@@ -295,7 +300,7 @@ object Main {
                     fileContent // making sure `cat file | ktlint --stdint > file` is (relatively) safe
                 }
                 if (stdin) {
-                    println(formattedFileContent)
+                    print(formattedFileContent)
                 } else {
                     if (fileContent !== formattedFileContent) {
                         File(fileName).writeText(formattedFileContent, charset("UTF-8"))
@@ -303,7 +308,7 @@ object Main {
                 }
             } else {
                 try {
-                    lint(fileName, fileContent, ruleSetProviders.map { it.second.get() }, localUserData) { err ->
+                    lint(fileName, fileContent, ruleSetProviders.map { it.second.get() }, userData) { err ->
                         result.add(LintErrorWithCorrectionInfo(err, false))
                         tripped.set(true)
                     }
@@ -321,7 +326,11 @@ object Main {
             errorNumber.addAndGet(errListLimit)
             reporter.before(fileName)
             errList.head(errListLimit).forEach { (err, corrected) ->
-                reporter.onLintError(fileName, err, corrected)
+                reporter.onLintError(
+                    fileName,
+                    if (!err.canBeAutoCorrected) err.copy(detail = err.detail + " (cannot be auto-corrected)") else err,
+                    corrected
+                )
             }
             reporter.after(fileName)
         }
@@ -345,6 +354,48 @@ object Main {
         }
     }
 
+    private fun userDataResolver(): (String) -> Map<String, String> {
+        val cliUserData = mapOf("android" to android.toString())
+        if (editorConfigPath != null) {
+            val userData = (
+                EditorConfig.of(File(editorConfigPath).canonicalPath)
+                    ?.onlyIf({ debug }) { printEditorConfigChain(it) }
+                ?: emptyMap<String, String>()
+            ) + cliUserData
+            return fun (fileName: String) = userData + ("file_path" to fileName)
+        }
+        val workdirUserData = lazy {
+            (
+                EditorConfig.of(workDir)
+                    ?.onlyIf({ debug }) { printEditorConfigChain(it) }
+                ?: emptyMap<String, String>()
+            ) + cliUserData
+        }
+        val editorConfig = EditorConfig.cached()
+        val editorConfigSet = ConcurrentHashMap<Path, Boolean>()
+        return fun (fileName: String): Map<String, String> {
+            if (fileName == "<text>") {
+                return workdirUserData.value
+            }
+            return (
+                editorConfig.of(Paths.get(fileName).parent)
+                    ?.onlyIf({ debug }) {
+                        printEditorConfigChain(it) {
+                            editorConfigSet.put(it.path, true) != true
+                        }
+                    }
+                ?: emptyMap<String, String>()
+            ) + cliUserData + ("file_path" to fileName)
+        }
+    }
+
+    private fun printEditorConfigChain(ec: EditorConfig, predicate: (EditorConfig) -> Boolean = { true }) {
+        for (lec in generateSequence(ec) { it.parent }.takeWhile(predicate)) {
+            System.err.println("[DEBUG] Discovered .editorconfig (${lec.path.parent.toFile().location()})" +
+                " {${lec.entries.joinToString(", ")}}")
+        }
+    }
+
     private fun getImplementationVersion() = javaClass.`package`.implementationVersion
         // JDK 9 regression workaround (https://bugs.openjdk.java.net/browse/JDK-8190987, fixed in JDK 10)
         // (note that version reported by the fallback might not be null if META-INF/MANIFEST.MF is
@@ -354,7 +405,7 @@ object Main {
                 Manifest(stream).mainAttributes.getValue("Implementation-Version")
             }
 
-    private fun loadReporter(dependencyResolver: Lazy<MavenDependencyResolver>): Reporter {
+    private fun loadReporter(dependencyResolver: Lazy<MavenDependencyResolver>, tripped: () -> Boolean): Reporter {
         data class ReporterTemplate(val id: String, val artifact: String?, val config: Map<String, String>, var output: String?)
         val tpls = (if (reporters.isEmpty()) listOf("plain") else reporters)
             .map { reporter ->
@@ -397,14 +448,19 @@ object Main {
             } else if (stdin) System.err else System.out
             return reporterProvider.get(stream, config)
                 .let { reporter ->
-                    if (output != null)
+                    if (output != null) {
                         object : Reporter by reporter {
                             override fun afterAll() {
                                 reporter.afterAll()
                                 stream.close()
+                                if (tripped()) {
+                                    System.err.println("\"$id\" report written to ${File(output).absoluteFile.location()}")
+                                }
                             }
                         }
-                    else reporter
+                    } else {
+                        reporter
+                    }
                 }
         }
         return Reporter.from(*tpls.map { it.toReporter() }.toTypedArray())
@@ -485,6 +541,30 @@ object Main {
         preCommitHookFile.writeBytes(expectedPreCommitHook)
         preCommitHookFile.setExecutable(true)
         System.err.println(".git/hooks/pre-commit installed")
+    }
+
+    private fun installGitPrePushHook() {
+        if (!File(".git").isDirectory) {
+            System.err.println(".git directory not found. " +
+                "Are you sure you are inside project root directory?")
+            exitProcess(1)
+        }
+        val hooksDir = File(".git", "hooks")
+        hooksDir.mkdirsOrFail()
+        val prePushHookFile = File(hooksDir, "pre-push")
+        val expectedPrePushHook = ClassLoader.getSystemClassLoader()
+            .getResourceAsStream("ktlint-git-pre-push-hook${if (android) "-android" else ""}.sh").readBytes()
+        // backup existing hook (if any)
+        val actualPrePushHook = try { prePushHookFile.readBytes() } catch (e: FileNotFoundException) { null }
+        if (actualPrePushHook != null && !actualPrePushHook.isEmpty() && !Arrays.equals(actualPrePushHook, expectedPrePushHook)) {
+            val backupFile = File(hooksDir, "pre-push.ktlint-backup." + hex(actualPrePushHook))
+            System.err.println(".git/hooks/pre-push -> $backupFile")
+            prePushHookFile.copyTo(backupFile, overwrite = true)
+        }
+        // > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+        prePushHookFile.writeBytes(expectedPrePushHook)
+        prePushHookFile.setExecutable(true)
+        System.err.println(".git/hooks/pre-push installed")
     }
 
     private fun applyToIDEA() {
@@ -647,11 +727,39 @@ object Main {
         url.forEach { method.invoke(this, it) }
     }
 
+    private fun File.mkdirsOrFail() {
+        if (!mkdirs() && !isDirectory) {
+            throw IOException("Unable to create \"${this}\" directory")
+        }
+    }
+
+    /**
+     * Executes "Callable"s in parallel (lazily).
+     * The results are gathered one-by-one (by `cb(<callable result>)`) in the order of corresponding "Callable"s
+     * in the "Sequence" (think `seq.toList().map { executorService.submit(it) }.forEach { cb(it.get()) }` but without
+     * buffering an entire sequence).
+     *
+     * Once kotlinx-coroutines are out of "experimental" stage everything below can be replaced with
+     * ```
+     * suspend fun <T> Sequence<Callable<T>>.parallel(...) {
+     *     val ctx = newFixedThreadPoolContext(numberOfThreads, "Sequence<Callable<T>>.parallel")
+     *     ctx.use {
+     *         val channel = produce(ctx, numberOfThreads) {
+     *             for (task in this@parallel) {
+     *                 send(async(ctx) { task.call() })
+     *             }
+     *         }
+     *         for (res in channel) {
+     *             cb(res.await())
+     *         }
+     *     }
+     * }
+     * ```
+     */
     private fun <T> Sequence<Callable<T>>.parallel(
         cb: (T) -> Unit,
         numberOfThreads: Int = Runtime.getRuntime().availableProcessors()
     ) {
-        val q = ArrayBlockingQueue<Future<T>>(numberOfThreads)
         val pill = object : Future<T> {
 
             override fun isDone(): Boolean { throw UnsupportedOperationException() }
@@ -660,22 +768,28 @@ object Main {
             override fun cancel(mayInterruptIfRunning: Boolean): Boolean { throw UnsupportedOperationException() }
             override fun isCancelled(): Boolean { throw UnsupportedOperationException() }
         }
-        val consumer = Thread(Runnable {
-            while (true) {
-                val future = q.poll(Long.MAX_VALUE, TimeUnit.NANOSECONDS)
-                if (future === pill) {
-                    break
+        val q = ArrayBlockingQueue<Future<T>>(numberOfThreads)
+        val producer = thread(start = true) {
+            val executorService = Executors.newCachedThreadPool()
+            try {
+                for (task in this) {
+                    q.put(executorService.submit(task))
                 }
-                cb(future.get())
+                q.put(pill)
+            } catch (e: InterruptedException) {
+                // we've been asked to stop consuming sequence
+            } finally {
+                executorService.shutdown()
             }
-        })
-        consumer.start()
-        val executorService = Executors.newCachedThreadPool()
-        for (v in this) {
-            q.put(executorService.submit(v))
         }
-        q.put(pill)
-        executorService.shutdown()
-        consumer.join()
+        try {
+            while (true) {
+                val result = q.take()
+                if (result != pill) cb(result.get()) else break
+            }
+        } finally {
+            producer.interrupt() // in case q.take()/result.get() throws
+            producer.join()
+        }
     }
 }
