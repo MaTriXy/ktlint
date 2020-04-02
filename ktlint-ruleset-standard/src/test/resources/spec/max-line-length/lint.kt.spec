@@ -1,5 +1,9 @@
-package com.omg.sooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo.long
-import com.omg.soooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo.long
+package com.omgsooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo.long
+
+import com.omg.sooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo.superduper.long
+import com.omg.kindof.long // ktlint-disable fake-rule-with-a-super-duper-long-name
+import com.omg.kindof.long // some other comment that is really long why is this here?
+
 // http://______________________________________________________________________.
 fun main() {
     // comment padded with spaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaace
@@ -31,7 +35,8 @@ fun main() {
  */
 
 // expect
-// 6:1:Exceeded max line length (80)
-// 7:1:Exceeded max line length (80)
-// 8:1:Exceeded max line length (80)
-// 10:1:Exceeded max line length (80)
+// 5:1:Exceeded max line length (80) (cannot be auto-corrected)
+// 10:1:Exceeded max line length (80) (cannot be auto-corrected)
+// 11:1:Exceeded max line length (80) (cannot be auto-corrected)
+// 12:1:Exceeded max line length (80) (cannot be auto-corrected)
+// 14:1:Exceeded max line length (80) (cannot be auto-corrected)

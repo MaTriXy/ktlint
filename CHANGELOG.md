@@ -2,6 +2,205 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+### Added
+- ?
+
+### Changed
+- Kotlin was updated to 1.3.70 version
+
+### Fixed
+- ?
+
+### Deprecated
+- ?
+
+### Removed
+- ?
+
+## [0.36.0] - 2019-12-03
+
+### Added
+- HTML reporter ([#641](https://github.com/pinterest/ktlint/pull/641))
+- Experimental rule to lint enum entry names ([#638](https://github.com/pinterest/ktlint/pull/638))
+- `@Suppress("RemoveCurlyBracesFromTemplate")` now respected ([#263](https://github.com/pinterest/ktlint/pull/263))
+
+### Upgraded
+- Gradle version to 5.6.2 ([#616](https://github.com/pinterest/ktlint/pull/616))
+- Kotlin to 1.3.60 ([#658](https://github.com/pinterest/ktlint/pull/658))
+
+### Fixed
+- `.git` directory now discovered instead of hardcoded ([#623](https://github.com/pinterest/ktlint/pull/623))
+- Several bugs with the experimental annotation rule ([#628](https://github.com/pinterest/ktlint/pull/628)) ([#642](https://github.com/pinterest/ktlint/pull/642)) ([#654](https://github.com/pinterest/ktlint/pull/654)) ([#624](https://github.com/pinterest/ktlint/pull/624))
+- Allow newline after lambda return type ([#643](https://github.com/pinterest/ktlint/pull/643))
+- Allow empty first line in a function that returns an anonymous object ([#655](https://github.com/pinterest/ktlint/pull/655))
+- Indentation with lambda argument ([#627](https://github.com/pinterest/ktlint/pull/627))
+- ktlint can now lint UTF-8 files with BOM ([#630](https://github.com/pinterest/ktlint/pull/630)
+- Indentation with newline before return type ([#663](https://github.com/pinterest/ktlint/pull/663))
+- Build/tests on Windows ([#640](https://github.com/pinterest/ktlint/pull/640))
+- Allow whitespace after `(` followed by a comment ([#664](https://github.com/pinterest/ktlint/pull/664))
+
+## [0.35.0] - 2019-10-12
+
+### Added
+- Support for specifying color for output via `--color-name` command line flag. ([#585](https://github.com/pinterest/ktlint/pull/585))
+- Support for custom rulesets and providers on Java 9+ ([#573](https://github.com/pinterest/ktlint/pull/573))
+
+### Deprecated
+- `--apply-to-idea` flag; use `applyToIDEA` subcommand instead ([#554](https://github.com/pinterest/ktlint/pull/554))
+- `--apply-to-idea-project` flag; use `applyToIDEAProject` subcommand instead ([#593](https://github.com/pinterest/ktlint/pull/593))
+- `0.0.0-SNAPSHOT` builds; snapshot builds are now versioned, e.g. 0.35.0-SNAPSHOT ([#588](https://github.com/pinterest/ktlint/pull/588))
+  - Note: When using the new snapshot builds, you may need to add an explicit dependency on `kotlin-compiler-embeddable` to your ruleset project.
+
+### Removed
+- Support for loading 3rd party rulesets via Maven ([#566](https://github.com/pinterest/ktlint/pull/566))
+
+### Upgraded
+- Kotlin version to 1.3.50 ([#565](https://github.com/pinterest/ktlint/pull/565)) ([#611](https://github.com/pinterest/ktlint/pull/611))
+
+### Fixed
+- Bugs with spacing in experimental `AnnotationRule` ([#552](https://github.com/pinterest/ktlint/pull/552)) ([#601](https://github.com/pinterest/ktlint/pull/601/)
+- Brackets would be removed from empty companion object ([#600](https://github.com/pinterest/ktlint/pull/600/))
+- Bugs with experimental `IndentationRule` ([#597](https://github.com/pinterest/ktlint/pull/597/)) ([#599](https://github.com/pinterest/ktlint/pull/599/))
+- Erroneous space between `}` and `]` ([#596](https://github.com/pinterest/ktlint/pull/596))
+- Spacing around multiplication sign in lambdas ([#598](https://github.com/pinterest/ktlint/pull/598))
+- `--version` output with gradle-built JAR ([#613](https://github.com/pinterest/ktlint/issues/613))
+
+## [0.34.2] - 2019-07-22
+
+Minor bugfix release for 0.34.0. (Note: 0.34.1 deprecated/deleted due to regression in disabled_flags .editorconfig support.)
+
+### Added
+- Support for globally disabling rules via `--disabled_rules` command line flag. ([#534](https://github.com/pinterest/ktlint/pull/534))
+
+### Fixed
+- Regression with `--stdin` flag for `printAST` command ([#528](https://github.com/pinterest/ktlint/issues/528))
+- Regressions with `NoUnusedImports` rule ([#531](https://github.com/pinterest/ktlint/issues/531), [#526](https://github.com/pinterest/ktlint/issues/526))
+  - Note: this re-introduces [#405](https://github.com/pinterest/ktlint/issues/405)
+- Indentation for enums with multi-line initializers ([#518](https://github.com/pinterest/ktlint/issues/518))
+
+## [0.34.0] - 2019-07-15
+
+### Added
+- Support for Kotlin 1.3.41
+- Support for globally disabling rules via custom `disabled_rules` property in `.editorconfig` ([#503](https://github.com/pinterest/ktlint/pull/503))
+- `experimental:no-empty-first-line-in-method-block` ([#474](https://github.com/pinterest/ktlint/pull/474))
+- Unit tests for ruleset providers
+
+### Upgraded
+- AssertJ from 3.9.0 to 3.12.2 ([#520](https://github.com/pinterest/ktlint/pull/520)) 
+
+### Enabled
+- Final newline by default ([#446](https://github.com/pinterest/ktlint/pull/446))
+- `no-wildcard-import` (Re-enabled after temporarily disabling in 0.33.0)
+- `experimental:annotation` ([#509](https://github.com/pinterest/ktlint/pull/509))
+- `experimental:multiline-if-else` (no autocorrection)
+- `experimental:package-name` (currently only disallows underscores in package names)
+
+### Deprecated
+- `MavenDependencyResolver`. Scheduled to be removed in 0.35.0 ([#468](https://github.com/pinterest/ktlint/pull/468))
+- `--install-git-pre-commit-hook` flag; use `installGitPreCommitHook` subcommand instead ([#487](https://github.com/pinterest/ktlint/pull/487))
+- `--print-ast` flag; use `printAST` subcommand instead ([#500](https://github.com/pinterest/ktlint/pull/500))
+
+### Removed
+- Support for `--ruleset-repository` and `--ruleset-update` flags
+
+### Fixed
+- `import-ordering` will now refuse to format import lists that contain top-level comments ([#408](https://github.com/pinterest/ktlint/issues/408))
+- `no-unused-imports` reporting false negatives or false positives in some cases ([#405](https://github.com/pinterest/ktlint/issues/405)) and ([#506](https://github.com/pinterest/ktlint/issues/506))
+- `experimental:indent` incorrectly formatting a lambda's closing brace ([#479](https://github.com/pinterest/ktlint/issues/479))
+
+## [0.33.0] - 2019-05-28
+
+### Added
+- Support for Kotlin 1.3.31
+
+### Disabled
+- No wildcard imports rule ([#48](https://github.com/pinterest/ktlint/issues/48)). Developers wishing to still enforce this rule should add the code into a custom ruleset. 
+
+### Fixed
+- Spec file parsing is now platform-agnostic ([#365](https://github.com/pinterest/ktlint/pull/365))
+- Unnecessary newline after `->` in some cases ([#403](https://github.com/pinterest/ktlint/pull/403))
+- `SpacingAroundCommaRule` will no longer move code into comments
+- Made newlines after `=` less aggressive ([#368](https://github.com/pinterest/ktlint/issues/368)) ([#380](https://github.com/pinterest/ktlint/issues/380))
+- Erroneous newline when parameter comments are used ([#433](https://github.com/pinterest/ktlint/issues/433))
+
+## [0.32.0] - 2019-04-22
+
+### Added
+- `experimental/import-ordering` rule ([#189](https://github.com/pinterest/ktlint/issues/189)).
+  Use `ktlint --experimental` to enabled.
+- Support for Kotlin 1.3.30
+- Build now compatible with jitpack
+- `ktlint` now part of Homebrew core (`shyiko/ktlint` tap deprecated)
+
+### Fixed
+- Incorrectly flagging a missing newline for functions with no parameters ([#327](https://github.com/pinterest/ktlint/issues/327)).
+- Semicolons now allowed in KDocs ([#362](https://github.com/pinterest/ktlint/issues/362)).
+- Spaces now disallowed after `super` ([#369](https://github.com/pinterest/ktlint/issues/369)).
+- Annotations in function parameters now checked for indentation ([#374](https://github.com/pinterest/ktlint/issues/374)]
+
+### Changed
+- Code now lives in `com.pinterest` package
+- groupId now `com.pinterest`
+- Custom ruleset `META-INF.services` file must be renamed to `com.pinterest.ktlint.core.RuleSetProvider`
+
+## [0.31.0] - 2019-03-10
+
+### Added
+- `dot-spacing` rule ([#293](https://github.com/shyiko/ktlint/issues/293)).
+- `experimental/indent` rule ([#338](https://github.com/shyiko/ktlint/issues/338)).  
+  Use `ktlint --experimental` to enable. 
+
+### Fixed
+- Spacing check around `<` & `>` operators.
+
+### Changed
+- `no-multi-spaces` rule (horizontal alignment of comments is no longer allowed) ([#269](https://github.com/shyiko/ktlint/issues/269)).
+- `colon-spacing` rule (`:` must not appear at the beginning of the line).
+- `package-name` rule (disabled until [#208](https://github.com/shyiko/ktlint/issues/208) is resolved).
+- `--print-ast` to output [com.pinterest.ktlint.core.ast.ElementType.*](https://github.com/shyiko/ktlint/blob/master/ktlint-core/src/main/kotlin/com/github/shyiko/ktlint/core/ast/ElementType.kt) as `node.elementType`, e.g. 
+```
+$ echo 'fun f() {}' | ./ktlint/target/ktlint --print-ast --color --stdin
+1: ~.psi.KtFile (FILE)
+1:   ~.psi.KtPackageDirective (PACKAGE_DIRECTIVE) ""
+1:   ~.psi.KtImportList (IMPORT_LIST) ""
+1:   ~.psi.KtScript (SCRIPT)
+1:     ~.psi.KtBlockExpression (BLOCK)
+1:       ~.psi.KtNamedFunction (FUN)
+1:         ~.c.i.p.impl.source.tree.LeafPsiElement (FUN_KEYWORD) "fun"
+1:         ~.c.i.p.impl.source.tree.PsiWhiteSpaceImpl (WHITE_SPACE) " "
+1:         ~.c.i.p.impl.source.tree.LeafPsiElement (IDENTIFIER) "f"
+1:         ~.psi.KtParameterList (VALUE_PARAMETER_LIST)
+1:           ~.c.i.p.impl.source.tree.LeafPsiElement (LPAR) "("
+1:           ~.c.i.p.impl.source.tree.LeafPsiElement (RPAR) ")"
+1:         ~.c.i.p.impl.source.tree.PsiWhiteSpaceImpl (WHITE_SPACE) " "
+1:         ~.psi.KtBlockExpression (BLOCK)
+1:           ~.c.i.p.impl.source.tree.LeafPsiElement (LBRACE) "{"
+1:           ~.c.i.p.impl.source.tree.LeafPsiElement (RBRACE) "}"
+1:       ~.c.i.p.impl.source.tree.PsiWhiteSpaceImpl (WHITE_SPACE) "\n"
+
+   format: <line_number:> <node.psi::class> (<node.elementType>) "<node.text>"
+   legend: ~ = org.jetbrains.kotlin, c.i.p = com.intellij.psi
+```
+
+- `kotlin-compiler` version to 1.3.21 (from 1.3.20).
+
+### Removed 
+- Dependency on JCenter ([#349](https://github.com/shyiko/ktlint/issues/349)).
+
+## [0.30.0] - 2019-02-03
+
+### Fixed
+- `Missing newline before ")"` ([#327](https://github.com/shyiko/ktlint/issues/327)).
+
+### Changed
+- `kotlin-compiler` version to 1.3.20 (from 1.2.71) ([#331](https://github.com/shyiko/ktlint/issues/331)).
+
+### Security
+- `--ruleset`/`--reporter` switched to HTTPS ([#332](https://github.com/shyiko/ktlint/issues/332)).
+
 ## [0.29.0] - 2018-10-02
 
 ### Fixed
@@ -468,6 +667,14 @@ set in `[*{kt,kts}]` section).
 
 ## 0.1.0 - 2016-07-27
 
+[0.36.0]: https://github.com/shyiko/ktlint/compare/0.35.0...0.36.0
+[0.35.0]: https://github.com/shyiko/ktlint/compare/0.34.2...0.35.0
+[0.34.2]: https://github.com/shyiko/ktlint/compare/0.33.0...0.34.2
+[0.34.0]: https://github.com/shyiko/ktlint/compare/0.33.0...0.34.0
+[0.33.0]: https://github.com/shyiko/ktlint/compare/0.32.0...0.33.0
+[0.32.0]: https://github.com/shyiko/ktlint/compare/0.31.0...0.32.0
+[0.31.0]: https://github.com/shyiko/ktlint/compare/0.30.0...0.31.0
+[0.30.0]: https://github.com/shyiko/ktlint/compare/0.29.0...0.30.0
 [0.29.0]: https://github.com/shyiko/ktlint/compare/0.28.0...0.29.0
 [0.28.0]: https://github.com/shyiko/ktlint/compare/0.27.0...0.28.0
 [0.27.0]: https://github.com/shyiko/ktlint/compare/0.26.0...0.27.0
